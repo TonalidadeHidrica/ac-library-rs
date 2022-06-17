@@ -1,7 +1,6 @@
 use crate::internal_bit::ceil_pow2;
 use crate::internal_type_traits::{BoundedAbove, BoundedBelow, One, Zero};
 use std::cmp::{max, min, Ordering};
-use std::convert::Infallible;
 use std::iter::{empty, repeat_with, FromIterator};
 use std::marker::PhantomData;
 use std::ops::{Add, Mul};
@@ -9,110 +8,122 @@ use std::ops::{Add, Mul};
 // TODO Should I split monoid-related traits to another module?
 pub trait Monoid {
     type S: Clone;
-    fn identity() -> Self::S;
-    fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S;
+    fn identity(&self) -> Self::S;
+    fn binary_operation(&self, a: &Self::S, b: &Self::S) -> Self::S;
 }
 
-pub struct Max<S>(Infallible, PhantomData<fn() -> S>);
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Max<S>(PhantomData<fn() -> S>);
 impl<S> Monoid for Max<S>
 where
     S: Copy + Ord + BoundedBelow,
 {
     type S = S;
-    fn identity() -> Self::S {
+    fn identity(&self) -> Self::S {
         S::min_value()
     }
-    fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
+    fn binary_operation(&self, a: &Self::S, b: &Self::S) -> Self::S {
         max(*a, *b)
     }
 }
 
-pub struct Min<S>(Infallible, PhantomData<fn() -> S>);
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Min<S>(PhantomData<fn() -> S>);
 impl<S> Monoid for Min<S>
 where
     S: Copy + Ord + BoundedAbove,
 {
     type S = S;
-    fn identity() -> Self::S {
+    fn identity(&self) -> Self::S {
         S::max_value()
     }
-    fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
+    fn binary_operation(&self, a: &Self::S, b: &Self::S) -> Self::S {
         min(*a, *b)
     }
 }
 
-pub struct Additive<S>(Infallible, PhantomData<fn() -> S>);
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Additive<S>(PhantomData<fn() -> S>);
 impl<S> Monoid for Additive<S>
 where
     S: Copy + Add<Output = S> + Zero,
 {
     type S = S;
-    fn identity() -> Self::S {
+    fn identity(&self) -> Self::S {
         S::zero()
     }
-    fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
+    fn binary_operation(&self, a: &Self::S, b: &Self::S) -> Self::S {
         *a + *b
     }
 }
 
-pub struct Multiplicative<S>(Infallible, PhantomData<fn() -> S>);
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Multiplicative<S>(PhantomData<fn() -> S>);
 impl<S> Monoid for Multiplicative<S>
 where
     S: Copy + Mul<Output = S> + One,
 {
     type S = S;
-    fn identity() -> Self::S {
+    fn identity(&self) -> Self::S {
         S::one()
     }
-    fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
+    fn binary_operation(&self, a: &Self::S, b: &Self::S) -> Self::S {
         *a * *b
     }
 }
 
-impl<M: Monoid> Default for Segtree<M> {
+impl<M: Default + Monoid> Default for Segtree<M> {
     fn default() -> Self {
         Segtree::new(0)
     }
 }
-impl<M: Monoid> Segtree<M> {
+impl<M: Default + Monoid> Segtree<M> {
     pub fn new(n: usize) -> Segtree<M> {
-        vec![M::identity(); n].into()
+        vec![M::default().identity(); n].into()
     }
 }
-impl<M: Monoid> From<Vec<M::S>> for Segtree<M> {
+impl<M: Default + Monoid> From<Vec<M::S>> for Segtree<M> {
     fn from(v: Vec<M::S>) -> Self {
         Self::from_vec(v, 0)
     }
 }
-impl<M: Monoid> FromIterator<M::S> for Segtree<M> {
+impl<M: Monoid + Default> FromIterator<M::S> for Segtree<M> {
     fn from_iter<T: IntoIterator<Item = M::S>>(iter: T) -> Self {
         let iter = iter.into_iter();
+
         let n = iter.size_hint().0;
         let log = ceil_pow2(n as u32) as usize;
         let size = 1 << log;
+
+        let m = M::default();
         let mut d = Vec::with_capacity(size * 2);
-        d.extend(repeat_with(M::identity).take(size).chain(iter));
+        d.extend(repeat_with(|| m.identity()).take(size).chain(iter));
+
         Self::from_vec(d, size)
     }
 }
-impl<M: Monoid> Segtree<M> {
+impl<M: Monoid + Default> Segtree<M> {
     /// Creates a segtree from elements `d[offset..]`.
     fn from_vec(mut d: Vec<M::S>, offset: usize) -> Self {
         assert!(offset <= d.len());
+
         let n = d.len() - offset;
         let log = ceil_pow2(n as u32) as usize;
         let size = 1 << log;
+
+        let m = M::default();
         match offset.cmp(&size) {
             Ordering::Less => {
-                d.splice(0..0, repeat_with(M::identity).take(size - offset));
+                d.splice(0..0, repeat_with(|| m.identity()).take(size - offset));
             }
             Ordering::Equal => {}
             Ordering::Greater => {
                 d.splice(size..offset, empty());
             }
         };
-        d.resize_with(size * 2, M::identity);
-        let mut ret = Segtree { n, size, log, d };
+        d.resize_with(size * 2, || m.identity());
+
+        let mut ret = Segtree { n, size, log, d, m };
         for i in (1..size).rev() {
             ret.update(i);
         }
@@ -137,25 +148,25 @@ impl<M: Monoid> Segtree<M> {
 
     pub fn prod(&self, mut l: usize, mut r: usize) -> M::S {
         assert!(l <= r && r <= self.n);
-        let mut sml = M::identity();
-        let mut smr = M::identity();
+        let mut sml = self.m.identity();
+        let mut smr = self.m.identity();
         l += self.size;
         r += self.size;
 
         while l < r {
             if l & 1 != 0 {
-                sml = M::binary_operation(&sml, &self.d[l]);
+                sml = self.m.binary_operation(&sml, &self.d[l]);
                 l += 1;
             }
             if r & 1 != 0 {
                 r -= 1;
-                smr = M::binary_operation(&self.d[r], &smr);
+                smr = self.m.binary_operation(&self.d[r], &smr);
             }
             l >>= 1;
             r >>= 1;
         }
 
-        M::binary_operation(&sml, &smr)
+        self.m.binary_operation(&sml, &smr)
     }
 
     pub fn all_prod(&self) -> M::S {
@@ -167,21 +178,21 @@ impl<M: Monoid> Segtree<M> {
         F: Fn(&M::S) -> bool,
     {
         assert!(l <= self.n);
-        assert!(f(&M::identity()));
+        assert!(f(&self.m.identity()));
         if l == self.n {
             return self.n;
         }
         l += self.size;
-        let mut sm = M::identity();
+        let mut sm = self.m.identity();
         while {
             // do
             while l % 2 == 0 {
                 l >>= 1;
             }
-            if !f(&M::binary_operation(&sm, &self.d[l])) {
+            if !f(&self.m.binary_operation(&sm, &self.d[l])) {
                 while l < self.size {
                     l *= 2;
-                    let res = M::binary_operation(&sm, &self.d[l]);
+                    let res = self.m.binary_operation(&sm, &self.d[l]);
                     if f(&res) {
                         sm = res;
                         l += 1;
@@ -189,7 +200,7 @@ impl<M: Monoid> Segtree<M> {
                 }
                 return l - self.size;
             }
-            sm = M::binary_operation(&sm, &self.d[l]);
+            sm = self.m.binary_operation(&sm, &self.d[l]);
             l += 1;
             // while
             {
@@ -205,22 +216,22 @@ impl<M: Monoid> Segtree<M> {
         F: Fn(&M::S) -> bool,
     {
         assert!(r <= self.n);
-        assert!(f(&M::identity()));
+        assert!(f(&self.m.identity()));
         if r == 0 {
             return 0;
         }
         r += self.size;
-        let mut sm = M::identity();
+        let mut sm = self.m.identity();
         while {
             // do
             r -= 1;
             while r > 1 && r % 2 == 1 {
                 r >>= 1;
             }
-            if !f(&M::binary_operation(&self.d[r], &sm)) {
+            if !f(&self.m.binary_operation(&self.d[r], &sm)) {
                 while r < self.size {
                     r = 2 * r + 1;
-                    let res = M::binary_operation(&self.d[r], &sm);
+                    let res = self.m.binary_operation(&self.d[r], &sm);
                     if f(&res) {
                         sm = res;
                         r -= 1;
@@ -228,7 +239,7 @@ impl<M: Monoid> Segtree<M> {
                 }
                 return r + 1 - self.size;
             }
-            sm = M::binary_operation(&self.d[r], &sm);
+            sm = self.m.binary_operation(&self.d[r], &sm);
             // while
             {
                 let r = r as isize;
@@ -239,7 +250,7 @@ impl<M: Monoid> Segtree<M> {
     }
 
     fn update(&mut self, k: usize) {
-        self.d[k] = M::binary_operation(&self.d[2 * k], &self.d[2 * k + 1]);
+        self.d[k] = self.m.binary_operation(&self.d[2 * k], &self.d[2 * k + 1]);
     }
 }
 
@@ -262,6 +273,7 @@ where
     size: usize,
     log: usize,
     d: Vec<M::S>,
+    m: M,
 }
 
 #[cfg(test)]
