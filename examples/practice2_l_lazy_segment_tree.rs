@@ -20,10 +20,10 @@ impl MapMonoid for F {
     type S = (u64, u64, u64);
     type F = bool;
 
-    fn identity_map() -> Self::F {
+    fn identity_map(&self) -> Self::F {
         false
     }
-    fn mapping(&f: &Self::F, &(a, b, c): &<M as Monoid>::S) -> <M as Monoid>::S {
+    fn mapping(&self, &f: &Self::F, &(a, b, c): &<M as Monoid>::S) -> <M as Monoid>::S {
         if f {
             // (a + b) * (a + b - 1) / 2 - a * (a - 1) / 2 - b * (b - 1) / 2 - c
             // = a * b - c
@@ -32,7 +32,7 @@ impl MapMonoid for F {
             (a, b, c)
         }
     }
-    fn composition(&f: &Self::F, &g: &Self::F) -> Self::F {
+    fn composition(&self, &f: &Self::F, &g: &Self::F) -> Self::F {
         f ^ g
     }
 }

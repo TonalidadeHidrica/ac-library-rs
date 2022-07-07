@@ -4,9 +4,9 @@ use crate::Monoid;
 pub trait MapMonoid {
     type S;
     type F: Clone;
-    fn identity_map() -> Self::F;
-    fn mapping(f: &Self::F, x: &Self::S) -> Self::S;
-    fn composition(f: &Self::F, g: &Self::F) -> Self::F;
+    fn identity_map(&self) -> Self::F;
+    fn mapping(&self, f: &Self::F, x: &Self::S) -> Self::S;
+    fn composition(&self, f: &Self::F, g: &Self::F) -> Self::F;
 }
 
 impl<M: Monoid, F: MapMonoid<S = M::S>> Default for LazySegtree<M, F>
@@ -70,7 +70,7 @@ impl<M: Monoid, F: MapMonoid<S = M::S>> LazySegtree<M, F> {
             }
         };
         d.resize_with(size * 2, || m.identity());
-        let lz = vec![F::identity_map(); size];
+        let lz = vec![f.identity_map(); size];
         let mut ret = LazySegtree {
             n,
             size,
@@ -155,7 +155,7 @@ impl<M: Monoid, F: MapMonoid<S = M::S>> LazySegtree<M, F> {
         for i in (1..=self.log).rev() {
             self.push(p >> i);
         }
-        self.d[p] = F::mapping(&f, &self.d[p]);
+        self.d[p] = self.f.mapping(&f, &self.d[p]);
         for i in 1..=self.log {
             self.update(p >> i);
         }
@@ -314,15 +314,15 @@ where
         self.d[k] = self.m.binary_operation(&self.d[2 * k], &self.d[2 * k + 1]);
     }
     fn all_apply(&mut self, k: usize, f: F::F) {
-        self.d[k] = F::mapping(&f, &self.d[k]);
+        self.d[k] = self.f.mapping(&f, &self.d[k]);
         if k < self.size {
-            self.lz[k] = F::composition(&f, &self.lz[k]);
+            self.lz[k] = self.f.composition(&f, &self.lz[k]);
         }
     }
     fn push(&mut self, k: usize) {
         self.all_apply(2 * k, self.lz[k].clone());
         self.all_apply(2 * k + 1, self.lz[k].clone());
-        self.lz[k] = F::identity_map();
+        self.lz[k] = self.f.identity_map();
     }
 }
 
@@ -367,15 +367,15 @@ mod tests {
         type S = i32;
         type F = i32;
 
-        fn identity_map() -> Self::F {
+        fn identity_map(&self) -> Self::F {
             0
         }
 
-        fn mapping(&f: &i32, &x: &i32) -> i32 {
+        fn mapping(&self, &f: &i32, &x: &i32) -> i32 {
             f + x
         }
 
-        fn composition(&f: &i32, &g: &i32) -> i32 {
+        fn composition(&self, &f: &i32, &g: &i32) -> i32 {
             f + g
         }
     }
@@ -475,11 +475,11 @@ mod tests {
         impl MapMonoid for IdAdditive {
             type S = u32;
             type F = ();
-            fn identity_map() {}
-            fn mapping(_: &(), &x: &u32) -> u32 {
+            fn identity_map(&self) {}
+            fn mapping(&self, _: &(), &x: &u32) -> u32 {
                 x
             }
-            fn composition(_: &(), _: &()) {}
+            fn composition(&self, _: &(), _: &()) {}
         }
 
         let (m, f) = (Additive::default(), IdAdditive);

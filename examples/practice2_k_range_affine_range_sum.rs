@@ -21,16 +21,16 @@ impl MapMonoid for Affine {
     type S = (Mint, usize);
     type F = (Mint, Mint);
 
-    fn identity_map() -> Self::F {
+    fn identity_map(&self) -> Self::F {
         (1.into(), 0.into())
     }
 
-    fn mapping(&(a, b): &Self::F, &(x, n): &Self::S) -> Self::S {
+    fn mapping(&self, &(a, b): &Self::F, &(x, n): &Self::S) -> Self::S {
         (a * x + b * Mint::new(n), n)
     }
 
     // a(cx + d) + b = (ac)x + (ad+b)
-    fn composition(&(a, b): &Self::F, &(c, d): &Self::F) -> Self::F {
+    fn composition(&self, &(a, b): &Self::F, &(c, d): &Self::F) -> Self::F {
         (a * c, a * d + b)
     }
 }
