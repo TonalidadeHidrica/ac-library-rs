@@ -3,19 +3,21 @@ use ac_library_rs::{LazySegtree, MapMonoid, Monoid};
 use std::io::Read;
 use std::iter;
 
+#[derive(Default)]
 struct M;
 impl Monoid for M {
     type S = (u64, u64, u64);
-    fn identity() -> Self::S {
+    fn identity(&self) -> Self::S {
         (0, 0, 0)
     }
-    fn binary_operation(&(a, b, c): &Self::S, &(d, e, f): &Self::S) -> Self::S {
+    fn binary_operation(&self, &(a, b, c): &Self::S, &(d, e, f): &Self::S) -> Self::S {
         (a + d, b + e, c + f + b * d)
     }
 }
+#[derive(Default)]
 struct F;
 impl MapMonoid for F {
-    type M = M;
+    type S = (u64, u64, u64);
     type F = bool;
 
     fn identity_map() -> Self::F {
@@ -42,7 +44,7 @@ fn main() {
 
     let n = input.next().unwrap().parse().unwrap();
     let q = input.next().unwrap().parse().unwrap();
-    let mut segtree: LazySegtree<F> = iter::once((0, 0, 0))
+    let mut segtree: LazySegtree<M, F> = iter::once((0, 0, 0))
         .chain(input.by_ref().take(n).map(|s| match s {
             "0" => (1, 0, 0),
             "1" => (0, 1, 0),
