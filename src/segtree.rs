@@ -84,7 +84,7 @@ impl<M: Default + Monoid> Segtree<M> {
 }
 impl<M: Default + Monoid> From<Vec<M::S>> for Segtree<M> {
     fn from(v: Vec<M::S>) -> Self {
-        Self::from_vec(v, 0)
+        Self::from_vec(M::default(), v, 0)
     }
 }
 impl<M: Monoid + Default> FromIterator<M::S> for Segtree<M> {
@@ -99,19 +99,18 @@ impl<M: Monoid + Default> FromIterator<M::S> for Segtree<M> {
         let mut d = Vec::with_capacity(size * 2);
         d.extend(repeat_with(|| m.identity()).take(size).chain(iter));
 
-        Self::from_vec(d, size)
+        Self::from_vec(m, d, size)
     }
 }
-impl<M: Monoid + Default> Segtree<M> {
+impl<M: Monoid> Segtree<M> {
     /// Creates a segtree from elements `d[offset..]`.
-    fn from_vec(mut d: Vec<M::S>, offset: usize) -> Self {
+    fn from_vec(m: M, mut d: Vec<M::S>, offset: usize) -> Self {
         assert!(offset <= d.len());
 
         let n = d.len() - offset;
         let log = ceil_pow2(n as u32) as usize;
         let size = 1 << log;
 
-        let m = M::default();
         match offset.cmp(&size) {
             Ordering::Less => {
                 d.splice(0..0, repeat_with(|| m.identity()).take(size - offset));
@@ -363,32 +362,34 @@ mod tests {
 
     #[test]
     fn test_from_vec() {
+        let m = Additive::default();
+
         let v = vec![1, 2, 4];
         let ans_124 = vec![7, 3, 4, 1, 2, 4, 0];
-        let tree = Segtree::<Additive<_>>::from_vec(v, 0);
+        let tree = Segtree::from_vec(m, v, 0);
         assert_eq!(&tree.d[1..], &ans_124[..]);
 
         let v = vec![1, 2, 4, 8];
-        let tree = Segtree::<Additive<_>>::from_vec(v, 0);
+        let tree = Segtree::from_vec(m, v, 0);
         assert_eq!(&tree.d[1..], &vec![15, 3, 12, 1, 2, 4, 8][..]);
 
         let v = vec![1, 2, 4, 8, 16];
-        let tree = Segtree::<Additive<_>>::from_vec(v, 0);
+        let tree = Segtree::from_vec(m, v, 0);
         assert_eq!(
             &tree.d[1..],
             &vec![31, 15, 16, 3, 12, 16, 0, 1, 2, 4, 8, 16, 0, 0, 0][..]
         );
 
         let v = vec![314, 159, 265, 1, 2, 4];
-        let tree = Segtree::<Additive<_>>::from_vec(v, 3);
+        let tree = Segtree::from_vec(m, v, 3);
         assert_eq!(&tree.d[1..], &ans_124[..]);
 
         let v = vec![314, 159, 265, 897, 1, 2, 4];
-        let tree = Segtree::<Additive<_>>::from_vec(v, 4);
+        let tree = Segtree::from_vec(m, v, 4);
         assert_eq!(&tree.d[1..], &ans_124[..]);
 
         let v = vec![314, 159, 265, 897, 932, 1, 2, 4];
-        let tree = Segtree::<Additive<_>>::from_vec(v, 5);
+        let tree = Segtree::from_vec(m, v, 5);
         assert_eq!(&tree.d[1..], &ans_124[..]);
     }
 }
