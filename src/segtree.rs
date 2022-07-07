@@ -275,6 +275,53 @@ where
     m: M,
 }
 
+struct ClosureMonoid<F, G> {
+    identity: F,
+    binary_operation: G,
+}
+impl<S, F, G> Monoid for ClosureMonoid<F, G>
+where
+    S: Clone,
+    F: Fn() -> S,
+    G: Fn(&S, &S) -> S,
+{
+    type S = S;
+    fn identity(&self) -> Self::S {
+        (self.identity)()
+    }
+    fn binary_operation(&self, a: &Self::S, b: &Self::S) -> Self::S {
+        (self.binary_operation)(a, b)
+    }
+}
+
+pub struct SegtreeBuilder<F, G> {
+    monoid: ClosureMonoid<F, G>,
+}
+impl<M: Monoid> Segtree<M> {
+    pub fn from_fn<S, F, G>(identity: F, binary_operation: G) -> SegtreeBuilder<F, G>
+    where
+        S: Clone,
+        F: Fn() -> S,
+        G: Fn(&S, &S) -> S,
+    {
+        SegtreeBuilder {
+            monoid: ClosureMonoid {
+                identity,
+                binary_operation,
+            },
+        }
+    }
+}
+impl<S, F, G> SegtreeBuilder<F, G>
+where
+    S: Clone,
+    F: Fn() -> S,
+    G: Fn(&S, &S) -> S,
+{
+    fn new(&self, n: usize) {
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::segtree::{Additive, Max};
