@@ -563,7 +563,11 @@ mod tests {
         assert_eq!(&tree.d[1..], &ans_124[..]);
     }
 
-    fn check(base: &[i32], segtree: &mut LazySegtree<MaxAdd>, range: impl RangeBounds<usize>) {
+    fn check(
+        base: &[i32],
+        segtree: &mut LazySegtree<Max<i32>, MaxAdd>,
+        range: impl RangeBounds<usize>,
+    ) {
         let expected = base
             .iter()
             .enumerate()

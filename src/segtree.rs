@@ -122,7 +122,7 @@ impl<M: Default + Monoid> Default for Segtree<M> {
 }
 impl<M: Default + Monoid> Segtree<M> {
     pub fn new(n: usize) -> Segtree<M> {
-        vec![M::default().identity(); n].into()
+        Self::from_monoid(M::default(), n)
     }
 }
 impl<M: Default + Monoid> From<Vec<M::S>> for Segtree<M> {
@@ -146,6 +146,11 @@ impl<M: Monoid + Default> FromIterator<M::S> for Segtree<M> {
     }
 }
 impl<M: Monoid> Segtree<M> {
+    fn from_monoid(m: M, n: usize) -> Self {
+        let v = vec![m.identity(); n];
+        Self::from_vec(m, v, 0)
+    }
+
     /// Creates a segtree from elements `d[offset..]`.
     fn from_vec(m: M, mut d: Vec<M::S>, offset: usize) -> Self {
         assert!(offset <= d.len());
@@ -385,7 +390,9 @@ where
     F: Fn() -> S,
     G: Fn(&S, &S) -> S,
 {
-    fn new(&self, n: usize) {}
+    fn new(self, n: usize) -> Segtree<ClosureMonoid<F, G>> {
+        Segtree::from_monoid(self.monoid, n)
+    }
 }
 
 #[cfg(test)]
