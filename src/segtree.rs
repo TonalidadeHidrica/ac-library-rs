@@ -347,7 +347,7 @@ where
     m: M,
 }
 
-struct ClosureMonoid<F, G> {
+pub struct ClosureMonoid<F, G> {
     identity: F,
     binary_operation: G,
 }
@@ -369,7 +369,13 @@ where
 pub struct SegtreeBuilder<F, G> {
     monoid: ClosureMonoid<F, G>,
 }
-impl<M: Monoid> Segtree<M> {
+struct DummyMonoidForSegtreeFromFn;
+impl Monoid for DummyMonoidForSegtreeFromFn {
+    type S = ();
+    fn identity(&self) -> Self::S {}
+    fn binary_operation(&self, _a: &Self::S, _b: &Self::S) -> Self::S {}
+}
+impl Segtree<DummyMonoidForSegtreeFromFn> {
     pub fn from_fn<S, F, G>(identity: F, binary_operation: G) -> SegtreeBuilder<F, G>
     where
         S: Clone,
@@ -390,7 +396,9 @@ where
     F: Fn() -> S,
     G: Fn(&S, &S) -> S,
 {
-    fn new(self, n: usize) -> Segtree<ClosureMonoid<F, G>> {
+    #[allow(clippy::new_ret_no_self)]
+    #[allow(clippy::wrong_self_convention)]
+    pub fn new(self, n: usize) -> Segtree<ClosureMonoid<F, G>> {
         Segtree::from_monoid(self.monoid, n)
     }
 }
@@ -398,17 +406,34 @@ where
 #[cfg(test)]
 mod tests {
     use crate::segtree::{Additive, Max};
-    use crate::Segtree;
+    use crate::{Monoid, Segtree};
     use std::ops::{Bound::*, RangeBounds};
 
     #[test]
-    fn test_max_segtree() {
+    fn test_max_segtree_from_struct() {
         let base = vec![3, 1, 4, 1, 5, 9, 2, 6, 5, 3];
-        let n = base.len();
+
         let segtree: Segtree<Max<_>> = base.clone().into();
         check_segtree(&base, &segtree);
 
-        let mut segtree = Segtree::<Max<_>>::new(n);
+        let segtree = Segtree::<Max<_>>::new(base.len());
+        test_max_segtree(&base, segtree);
+    }
+
+    #[test]
+    fn test_from_fn() {
+        let base = vec![3, 1, 4, 1, 5, 9, 2, 6, 5, 3];
+
+        let segtree = Segtree::from_fn(i32::min_value, |&x, &y| x.max(y)).new(base.len());
+        test_max_segtree(&base, segtree);
+    }
+
+    fn test_max_segtree<M>(base: &[i32], mut segtree: Segtree<M>)
+    where
+        M: Monoid<S = i32>,
+    {
+        let n = base.len();
+
         let mut internal = vec![i32::min_value(); n];
         for i in 0..n {
             segtree.set(i, base[i]);
@@ -434,7 +459,11 @@ mod tests {
     }
 
     //noinspection DuplicatedCode
-    fn check_segtree(base: &[i32], segtree: &Segtree<Max<i32>>) {
+    /// `M` shuold behave the same as `Max<i32>`,
+    fn check_segtree<M>(base: &[i32], segtree: &Segtree<M>)
+    where
+        M: Monoid<S = i32>,
+    {
         let n = base.len();
         #[allow(clippy::needless_range_loop)]
         for i in 0..n {
@@ -489,6 +518,21 @@ mod tests {
         }
     }
 
+    /// `M` shuold behave the same as `Max<i32>`,
+    fn check<M>(base: &[i32], segtree: &Segtree<M>, range: impl RangeBounds<usize>)
+    where
+        M: Monoid<S = i32>,
+    {
+        let expected = base
+            .iter()
+            .enumerate()
+            .filter_map(|(i, a)| Some(a).filter(|_| range.contains(&i)))
+            .max()
+            .copied()
+            .unwrap_or(i32::min_value());
+        assert_eq!(segtree.prod(range), expected);
+    }
+
     #[test]
     fn test_from_vec() {
         let m = Additive::default();
@@ -520,16 +564,5 @@ mod tests {
         let v = vec![314, 159, 265, 897, 932, 1, 2, 4];
         let tree = Segtree::from_vec(m, v, 5);
         assert_eq!(&tree.d[1..], &ans_124[..]);
-    }
-
-    fn check(base: &[i32], segtree: &Segtree<Max<i32>>, range: impl RangeBounds<usize>) {
-        let expected = base
-            .iter()
-            .enumerate()
-            .filter_map(|(i, a)| Some(a).filter(|_| range.contains(&i)))
-            .max()
-            .copied()
-            .unwrap_or(i32::min_value());
-        assert_eq!(segtree.prod(range), expected);
     }
 }
