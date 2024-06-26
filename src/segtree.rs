@@ -347,6 +347,7 @@ where
     m: M,
 }
 
+#[derive(Clone, Copy)]
 pub struct ClosureMonoid<F, G> {
     identity: F,
     binary_operation: G,
@@ -369,19 +370,13 @@ where
 pub struct SegtreeBuilder<F, G> {
     monoid: ClosureMonoid<F, G>,
 }
-struct DummyMonoidForSegtreeFromFn;
-impl Monoid for DummyMonoidForSegtreeFromFn {
-    type S = ();
-    fn identity(&self) -> Self::S {}
-    fn binary_operation(&self, _a: &Self::S, _b: &Self::S) -> Self::S {}
-}
-impl Segtree<DummyMonoidForSegtreeFromFn> {
-    pub fn from_fn<S, F, G>(identity: F, binary_operation: G) -> SegtreeBuilder<F, G>
-    where
-        S: Clone,
-        F: Fn() -> S,
-        G: Fn(&S, &S) -> S,
-    {
+impl<S, F, G> Segtree<ClosureMonoid<F, G>>
+where
+    S: Clone,
+    F: Fn() -> S,
+    G: Fn(&S, &S) -> S,
+{
+    pub fn from_fn(identity: F, binary_operation: G) -> SegtreeBuilder<F, G> {
         SegtreeBuilder {
             monoid: ClosureMonoid {
                 identity,

@@ -366,6 +366,7 @@ use std::{
     cmp::Ordering,
     fmt::{Debug, Error, Formatter, Write},
     iter::{empty, repeat_with, FromIterator},
+    marker::PhantomData,
     ops::{Bound, RangeBounds},
 };
 impl<M, F> Debug for LazySegtree<M, F>
@@ -392,6 +393,38 @@ where
         Ok(())
     }
 }
+
+#[derive(Clone, Copy)]
+pub struct ClosureMapMonoid<S, FI, FM, FC> {
+    _phantom: PhantomData<fn() -> S>,
+    identity_map: FI,
+    mapping: FM,
+    composition: FC,
+}
+impl<S, F, FI, FM, FC> MapMonoid for ClosureMapMonoid<S, FI, FM, FC>
+where
+    F: Clone,
+    FI: Fn() -> F,
+    FM: Fn(&F, &S) -> S,
+    FC: Fn(&F, &F) -> F,
+{
+    type S = S;
+    type F = F;
+    fn identity_map(&self) -> Self::F {
+        (self.identity_map)()
+    }
+    fn mapping(&self, f: &Self::F, x: &Self::S) -> Self::S {
+        (self.mapping)(f, x)
+    }
+    fn composition(&self, f: &Self::F, g: &Self::F) -> Self::F {
+        (self.composition)(f, g)
+    }
+}
+
+// TODO Implement LazySegtree::from_fn
+// - which code should accept monoid closures?
+// - is it good design to define Segtree::from_fn?
+//   -  maybe Monoid::from_fn is better?
 
 #[cfg(test)]
 mod tests {
